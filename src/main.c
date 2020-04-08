@@ -24,8 +24,12 @@ triangle_t* triangles_to_render = NULL;
 bool is_running = false;
 int previous_frame_time = 0;
 
-mat4_t proj_matrix;
+///////////////////////////////////////////////////////////////////////////////
+// Global variables to store the main transformation matrices 
+///////////////////////////////////////////////////////////////////////////////
+mat4_t world_matrix;
 mat4_t view_matrix;
+mat4_t proj_matrix;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Setup function to initialize variables and game objects
@@ -114,15 +118,10 @@ void update(void) {
     triangles_to_render = NULL;
 
     // Change the mesh scale, rotation, and translation values per animation frame
-    mesh.rotation.x += -0.001;
+    mesh.rotation.x += 0.007;
     mesh.rotation.y += 0.000;
     mesh.rotation.z += 0.000;
-    mesh.translation.z = 15.0;
-
-    // Change the camera position values per frame
-    camera.position.x += 0.002;
-    camera.position.y += 0.001;
-    camera.position.z += 0.008;
+    mesh.translation.z = 5.0;
 
     // Create the view matrix to be used by camera transformation
     vec3_t target = { 0, 0, -10 };
@@ -152,8 +151,8 @@ void update(void) {
         for (int j = 0; j < 3; j++) {
             vec4_t transformed_vertex = vec4_from_vec3(face_vertices[j]);
 
-            // Create a World Matrix combining scale, rotation, and translation matrices
-            mat4_t world_matrix = mat4_identity();
+            // Defines the world matrix combining scale, rotation, and translation matrices
+            world_matrix = mat4_identity();
 
             // Order matters: First scale, then rotate, then translate. [T] * [R] * [S] * v
             world_matrix = mat4_mul_mat4(world_matrix, translation_matrix);

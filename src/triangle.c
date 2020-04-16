@@ -174,11 +174,18 @@ void draw_texel(
     vec4_t point_a, vec4_t point_b, vec4_t point_c,
     tex2_t a_uv, tex2_t b_uv, tex2_t c_uv
 ) {
+    // Do not render if pixel is outside the screen limits
+    if (x >= window_width || y >= window_height) {
+        return;
+    }
+
+    // Create vec2 variables for vertices A, B, C, and point p
     vec2_t p = { x, y };
     vec2_t a = vec2_from_vec4(point_a);
     vec2_t b = vec2_from_vec4(point_b);
     vec2_t c = vec2_from_vec4(point_c);
 
+    // Compute the barycentric coordinates weights for point p inside triangle ABC
     vec3_t weights = barycentric_weights(a, b, c, p);
 
     float alpha = weights.x;

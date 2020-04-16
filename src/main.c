@@ -22,14 +22,15 @@ triangle_t* triangles_to_render = NULL;
 // Global variables for execution status and game loop
 ///////////////////////////////////////////////////////////////////////////////
 bool is_running = false;
+float delta_time;
 int previous_frame_time = 0;
 
 ///////////////////////////////////////////////////////////////////////////////
-// Global variables to store the main transformation matrices 
+// Global variables for execution status and game loop
 ///////////////////////////////////////////////////////////////////////////////
 mat4_t world_matrix;
-mat4_t view_matrix;
 mat4_t proj_matrix;
+mat4_t view_matrix;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Setup function to initialize variables and game objects
@@ -78,24 +79,59 @@ void process_input(void) {
             is_running = false;
             break;
         case SDL_KEYDOWN:
-            if (event.key.keysym.sym == SDLK_ESCAPE)
+            if (event.key.keysym.sym == SDLK_ESCAPE) {
                 is_running = false;
-            if (event.key.keysym.sym == SDLK_1)
+            }
+            if (event.key.keysym.sym == SDLK_1) {
                 render_method = RENDER_WIRE_VERTEX;
-            if (event.key.keysym.sym == SDLK_2)
+            }
+            if (event.key.keysym.sym == SDLK_2) {
                 render_method = RENDER_WIRE;
-            if (event.key.keysym.sym == SDLK_3)
+            }
+            if (event.key.keysym.sym == SDLK_3) {
                 render_method = RENDER_FILL_TRIANGLE;
-            if (event.key.keysym.sym == SDLK_4)
+            }
+            if (event.key.keysym.sym == SDLK_4) {
                 render_method = RENDER_FILL_TRIANGLE_WIRE;
-            if (event.key.keysym.sym == SDLK_5)
+            }
+            if (event.key.keysym.sym == SDLK_5) {
                 render_method = RENDER_TEXTURED;
-            if (event.key.keysym.sym == SDLK_6)
+            }
+            if (event.key.keysym.sym == SDLK_6) {
                 render_method = RENDER_TEXTURED_WIRE;
-            if (event.key.keysym.sym == SDLK_c)
+            }
+            if (event.key.keysym.sym == SDLK_c) {
                 cull_method = CULL_BACKFACE;
-            if (event.key.keysym.sym == SDLK_d)
+            }
+            if (event.key.keysym.sym == SDLK_x) {
                 cull_method = CULL_NONE;
+            }
+            if (event.key.keysym.sym == SDLK_UP) {
+                camera.position.y += +3.0 * delta_time;
+            }
+            if (event.key.keysym.sym == SDLK_DOWN) {
+                camera.position.y += -3.0 * delta_time;
+            }
+            if (event.key.keysym.sym == SDLK_LEFT) {
+                camera.position.x += +3.0 * delta_time;
+            }
+            if (event.key.keysym.sym == SDLK_RIGHT) {
+                camera.position.x += -3.0 * delta_time;
+            }
+            if (event.key.keysym.sym == SDLK_a) {
+                camera.yaw += +1.0 * delta_time;
+            }
+            if (event.key.keysym.sym == SDLK_d) {
+                camera.yaw += -1.0 * delta_time;
+            }
+            if (event.key.keysym.sym == SDLK_s) {
+                camera.forward_velocity = vec3_mul(camera.direction, 5.0 * delta_time);
+                camera.position = vec3_add(camera.position, camera.forward_velocity);
+            }
+            if (event.key.keysym.sym == SDLK_w) {
+                camera.forward_velocity = vec3_mul(camera.direction, 5.0 * delta_time);
+                camera.position = vec3_sub(camera.position, camera.forward_velocity);
+            }
             break;
     }
 }
@@ -112,20 +148,31 @@ void update(void) {
         SDL_Delay(time_to_wait);
     }
 
+    // Get a delta time factor converted to seconds to be used to update my objects
+    delta_time = (SDL_GetTicks() - previous_frame_time) / 1000.0f;
+
     previous_frame_time = SDL_GetTicks();
 
     // Initialize the array of triangles to render
     triangles_to_render = NULL;
 
     // Change the mesh scale, rotation, and translation values per animation frame
-    mesh.rotation.x += 0.007;
-    mesh.rotation.y += 0.000;
-    mesh.rotation.z += 0.000;
-    mesh.translation.z = 5.0;
+    mesh.rotation.x += 0.5 * delta_time;
+    mesh.rotation.y += 0.0 * delta_time;
+    mesh.rotation.z += 0.0 * delta_time;
+    mesh.translation.z = 7.0;
 
     // Create the view matrix to be used by camera transformation
-    vec3_t target = { 0, 0, -10 };
     vec3_t up = { 0, 1, 0 };
+
+    // Multiply the camera rotation matrix by the yaw factor by the target unit vector pointing along -z
+    vec3_t target = { 0, 0, -1 };
+    mat4_t camera_yaw_rotation = mat4_make_rotation_y(camera.yaw);
+    camera.direction = vec3_from_vec4(mat4_mul_vec4(camera_yaw_rotation, vec4_from_vec3(target)));
+
+    // offset the camera position by the rotated camera direction
+    target = vec3_add(camera.position, camera.direction);
+
     view_matrix = mat4_look_at(camera.position, target, up);
 
     // Create scale, rotation, and translation matrices that will be used to multiply the mesh vertices
@@ -151,7 +198,7 @@ void update(void) {
         for (int j = 0; j < 3; j++) {
             vec4_t transformed_vertex = vec4_from_vec3(face_vertices[j]);
 
-            // Defines the world matrix combining scale, rotation, and translation matrices
+            // Create a World Matrix combining scale, rotation, and translation matrices
             world_matrix = mat4_identity();
 
             // Order matters: First scale, then rotate, then translate. [T] * [R] * [S] * v
@@ -245,15 +292,17 @@ void update(void) {
         array_push(triangles_to_render, projected_triangle);
     }
 
-    // Sort the triangles to render by their avg_depth
-    int num_triangles = array_length(triangles_to_render);
-    for (int i = 0; i < num_triangles; i++) {
-        for (int j = i; j < num_triangles; j++) {
-            if (triangles_to_render[i].avg_depth < triangles_to_render[j].avg_depth) {
-                // Swap the triangles positions in the array
-                triangle_t temp = triangles_to_render[i];
-                triangles_to_render[i] = triangles_to_render[j];
-                triangles_to_render[j] = temp;
+    // Sort the triangles to render by their avg_depth if we are drawing filled triangles
+    if (render_method == RENDER_FILL_TRIANGLE || render_method == RENDER_FILL_TRIANGLE_WIRE) {
+        int num_triangles = array_length(triangles_to_render);
+        for (int i = 0; i < num_triangles; i++) {
+            for (int j = i; j < num_triangles; j++) {
+                if (triangles_to_render[i].avg_depth < triangles_to_render[j].avg_depth) {
+                    // Swap the triangles positions in the array
+                    triangle_t temp = triangles_to_render[i];
+                    triangles_to_render[i] = triangles_to_render[j];
+                    triangles_to_render[j] = temp;
+                }
             }
         }
     }

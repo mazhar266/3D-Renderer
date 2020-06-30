@@ -7,34 +7,42 @@ uint32_t* color_buffer = NULL;
 float* z_buffer = NULL;
 
 SDL_Texture* color_buffer_texture = NULL;
-int window_width = 800;
-int window_height = 600;
+int window_width = 320;
+int window_height = 200;
+int screen_width = 800;
+int screen_height = 600;
+int pixel_increment_x = 1;
+int pixel_increment_y = 1;
 
 bool initialize_window(void) {
     if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
         fprintf(stderr, "Error initializing SDL.\n");
         return false;
     }
-
     // Set width and height of the SDL window with the max screen resolution
     SDL_DisplayMode display_mode;
     SDL_GetCurrentDisplayMode(0, &display_mode);
+
+    screen_width = display_mode.w;
+    screen_height = display_mode.h;
+
     window_width = display_mode.w;
     window_height = display_mode.h;
-
+    
     // Create a SDL Window
     window = SDL_CreateWindow(
         NULL,
         SDL_WINDOWPOS_CENTERED,
         SDL_WINDOWPOS_CENTERED,
-        window_width,
-        window_height,
+        screen_width,
+        screen_height,
         SDL_WINDOW_BORDERLESS
     );
     if (!window) {
         fprintf(stderr, "Error creating SDL window.\n");
         return false;
     }
+    //SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN);
 
     // Create a SDL renderer
     renderer = SDL_CreateRenderer(window, -1, 0);
@@ -49,15 +57,16 @@ bool initialize_window(void) {
 void draw_grid(void) {
     for (int y = 0; y < window_height; y += 10) {
         for (int x = 0; x < window_width; x += 10) {
-            color_buffer[(window_width * y) + x] = 0xFF444444;
+            draw_pixel(x, y, 0xFF444444);
         }
     }
 }
 
 void draw_pixel(int x, int y, uint32_t color) {
-    if (x >= 0 && x < window_width && y >= 0 && y < window_height) {
-        color_buffer[(window_width * y) + x] = color;
+    if (x < 0 || x >= window_width || y < 0 || y >= window_height) {
+        return;
     }
+    color_buffer[(window_width * y) + x] = color;
 }
 
 void draw_line(int x0, int y0, int x1, int y1, uint32_t color) {
@@ -110,7 +119,7 @@ void clear_color_buffer(uint32_t color) {
 void clear_z_buffer(void) {
     for (int y = 0; y < window_height; y++) {
         for (int x = 0; x < window_width; x++) {
-            z_buffer[(window_width * y) + x] = 0.0;
+            z_buffer[(window_width * y) + x] = 1.0; 
         }
     }
 }

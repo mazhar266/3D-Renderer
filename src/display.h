@@ -29,6 +29,10 @@ extern float* z_buffer;
 extern SDL_Texture* color_buffer_texture;
 extern int window_width;
 extern int window_height;
+extern int screen_width;
+extern int screen_height;
+extern int pixel_increment_x;
+extern int pixel_increment_y;
 
 bool initialize_window(void);
 void draw_grid(void);

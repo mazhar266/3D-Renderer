@@ -86,9 +86,9 @@ void load_obj_file_data(char* filename) {
                 &vertex_indices[2], &texture_indices[2], &normal_indices[2]
             );
             face_t face = {
-                .a = vertex_indices[0] - 1,
-                .b = vertex_indices[1] - 1,
-                .c = vertex_indices[2] - 1,
+                .a = vertex_indices[0],
+                .b = vertex_indices[1],
+                .c = vertex_indices[2],
                 .a_uv = texcoords[texture_indices[0] - 1],
                 .b_uv = texcoords[texture_indices[1] - 1],
                 .c_uv = texcoords[texture_indices[2] - 1],

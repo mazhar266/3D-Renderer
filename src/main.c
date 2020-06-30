@@ -14,19 +14,21 @@
 #include "mesh.h"
 
 ///////////////////////////////////////////////////////////////////////////////
-// Array of triangles that should be rendered frame by frame
-///////////////////////////////////////////////////////////////////////////////
-triangle_t* triangles_to_render = NULL;
-
-///////////////////////////////////////////////////////////////////////////////
 // Global variables for execution status and game loop
 ///////////////////////////////////////////////////////////////////////////////
 bool is_running = false;
-float delta_time;
 int previous_frame_time = 0;
+float delta_time = 0; 
 
 ///////////////////////////////////////////////////////////////////////////////
-// Global variables for execution status and game loop
+// Array to store triangles that should be rendered each frame
+///////////////////////////////////////////////////////////////////////////////
+#define MAX_TRIANGLES 10000
+triangle_t triangles_to_render[MAX_TRIANGLES];
+int num_triangles_to_render = 0;
+
+///////////////////////////////////////////////////////////////////////////////
+// Declaration of our global transformation matrices
 ///////////////////////////////////////////////////////////////////////////////
 mat4_t world_matrix;
 mat4_t proj_matrix;
@@ -54,18 +56,17 @@ void setup(void) {
     );
 
     // Initialize the perspective projection matrix
-    float fov = M_PI / 3.0; // the same as 180/3, or 60deg
+    float fov = 3.141592 / 3.0; // the same as 180/3, or 60deg
     float aspect = (float)window_height / (float)window_width;
-    float znear = 0.1;
-    float zfar = 100.0;
+    float znear = 1.0;
+    float zfar = 20.0;
     proj_matrix = mat4_make_perspective(fov, aspect, znear, zfar);
 
     // Loads the vertex and face values for the mesh data structure
-    // load_cube_mesh_data();
-    load_obj_file_data("./assets/f117.obj");
+    load_obj_file_data("./assets/efa.obj");
 
     // Load the texture information from an external PNG file
-    load_png_texture_data("./assets/f117.png");
+    load_png_texture_data("./assets/efa.png");
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -79,57 +80,38 @@ void process_input(void) {
             is_running = false;
             break;
         case SDL_KEYDOWN:
-            if (event.key.keysym.sym == SDLK_ESCAPE) {
+            if (event.key.keysym.sym == SDLK_ESCAPE)
                 is_running = false;
-            }
-            if (event.key.keysym.sym == SDLK_1) {
+            if (event.key.keysym.sym == SDLK_1)
                 render_method = RENDER_WIRE_VERTEX;
-            }
-            if (event.key.keysym.sym == SDLK_2) {
+            if (event.key.keysym.sym == SDLK_2)
                 render_method = RENDER_WIRE;
-            }
-            if (event.key.keysym.sym == SDLK_3) {
+            if (event.key.keysym.sym == SDLK_3)
                 render_method = RENDER_FILL_TRIANGLE;
-            }
-            if (event.key.keysym.sym == SDLK_4) {
+            if (event.key.keysym.sym == SDLK_4)
                 render_method = RENDER_FILL_TRIANGLE_WIRE;
-            }
-            if (event.key.keysym.sym == SDLK_5) {
+            if (event.key.keysym.sym == SDLK_5)
                 render_method = RENDER_TEXTURED;
-            }
-            if (event.key.keysym.sym == SDLK_6) {
+            if (event.key.keysym.sym == SDLK_6)
                 render_method = RENDER_TEXTURED_WIRE;
-            }
-            if (event.key.keysym.sym == SDLK_c) {
+            if (event.key.keysym.sym == SDLK_c)
                 cull_method = CULL_BACKFACE;
-            }
-            if (event.key.keysym.sym == SDLK_x) {
+            if (event.key.keysym.sym == SDLK_x)
                 cull_method = CULL_NONE;
-            }
-            if (event.key.keysym.sym == SDLK_UP) {
-                camera.position.y += +3.0 * delta_time;
-            }
-            if (event.key.keysym.sym == SDLK_DOWN) {
-                camera.position.y += -3.0 * delta_time;
-            }
-            if (event.key.keysym.sym == SDLK_LEFT) {
-                camera.position.x += +3.0 * delta_time;
-            }
-            if (event.key.keysym.sym == SDLK_RIGHT) {
-                camera.position.x += -3.0 * delta_time;
-            }
-            if (event.key.keysym.sym == SDLK_a) {
-                camera.yaw += +1.0 * delta_time;
-            }
-            if (event.key.keysym.sym == SDLK_d) {
-                camera.yaw += -1.0 * delta_time;
-            }
-            if (event.key.keysym.sym == SDLK_s) {
-                camera.forward_velocity = vec3_mul(camera.direction, 5.0 * delta_time);
+            if (event.key.keysym.sym == SDLK_UP)
+                camera.position.y += 3.0 * delta_time;
+            if (event.key.keysym.sym == SDLK_DOWN)
+                camera.position.y -= 3.0 * delta_time;
+            if (event.key.keysym.sym == SDLK_a)
+                camera.yaw -= 1.0 * delta_time;
+            if (event.key.keysym.sym == SDLK_d)
+                camera.yaw += 1.0 * delta_time;
+            if (event.key.keysym.sym == SDLK_w) {
+                camera.forward_velocity = vec3_mul(camera.direction, 5.0 * delta_time); 
                 camera.position = vec3_add(camera.position, camera.forward_velocity);
             }
-            if (event.key.keysym.sym == SDLK_w) {
-                camera.forward_velocity = vec3_mul(camera.direction, 5.0 * delta_time);
+            if (event.key.keysym.sym == SDLK_s) {
+                camera.forward_velocity = vec3_mul(camera.direction, 5.0 * delta_time); 
                 camera.position = vec3_sub(camera.position, camera.forward_velocity);
             }
             break;
@@ -148,32 +130,31 @@ void update(void) {
         SDL_Delay(time_to_wait);
     }
 
-    // Get a delta time factor converted to seconds to be used to update my objects
-    delta_time = (SDL_GetTicks() - previous_frame_time) / 1000.0f;
+    // Get a delta time factor converted to seconds to be used to update our game objects
+    delta_time = (SDL_GetTicks() - previous_frame_time) / 1000.0;
 
     previous_frame_time = SDL_GetTicks();
 
-    // Initialize the array of triangles to render
-    triangles_to_render = NULL;
+    // Initialize the counter of triangles to render for the current frame
+    num_triangles_to_render = 0;
 
     // Change the mesh scale, rotation, and translation values per animation frame
-    mesh.rotation.x += 0.5 * delta_time;
+    mesh.rotation.x += 1.0 * delta_time;
     mesh.rotation.y += 0.0 * delta_time;
     mesh.rotation.z += 0.0 * delta_time;
-    mesh.translation.z = 7.0;
+    mesh.translation.z = 5.0;
 
-    // Create the view matrix to be used by camera transformation
-    vec3_t up = { 0, 1, 0 };
-
-    // Multiply the camera rotation matrix by the yaw factor by the target unit vector pointing along -z
-    vec3_t target = { 0, 0, -1 };
+    // Initialize the target looking at the positive z-axis
+    vec3_t target = { 0, 0, 1 };
     mat4_t camera_yaw_rotation = mat4_make_rotation_y(camera.yaw);
     camera.direction = vec3_from_vec4(mat4_mul_vec4(camera_yaw_rotation, vec4_from_vec3(target)));
 
-    // offset the camera position by the rotated camera direction
+    // Offset the camera position in the direction where the camera is pointing at
     target = vec3_add(camera.position, camera.direction);
-
-    view_matrix = mat4_look_at(camera.position, target, up);
+    vec3_t up_direction = { 0, 1, 0 };
+    
+    // Create the view matrix
+    view_matrix = mat4_look_at(camera.position, target, up_direction);
 
     // Create scale, rotation, and translation matrices that will be used to multiply the mesh vertices
     mat4_t scale_matrix = mat4_make_scale(mesh.scale.x, mesh.scale.y, mesh.scale.z);
@@ -188,9 +169,9 @@ void update(void) {
         face_t mesh_face = mesh.faces[i];
 
         vec3_t face_vertices[3];
-        face_vertices[0] = mesh.vertices[mesh_face.a];
-        face_vertices[1] = mesh.vertices[mesh_face.b];
-        face_vertices[2] = mesh.vertices[mesh_face.c];
+        face_vertices[0] = mesh.vertices[mesh_face.a - 1];
+        face_vertices[1] = mesh.vertices[mesh_face.b - 1];
+        face_vertices[2] = mesh.vertices[mesh_face.c - 1];
 
         vec4_t transformed_vertices[3];
 
@@ -201,12 +182,12 @@ void update(void) {
             // Create a World Matrix combining scale, rotation, and translation matrices
             world_matrix = mat4_identity();
 
-            // Order matters: First scale, then rotate, then translate. [T] * [R] * [S] * v
-            world_matrix = mat4_mul_mat4(world_matrix, translation_matrix);
-            world_matrix = mat4_mul_mat4(world_matrix, rotation_matrix_x);
-            world_matrix = mat4_mul_mat4(world_matrix, rotation_matrix_y);
-            world_matrix = mat4_mul_mat4(world_matrix, rotation_matrix_z);
-            world_matrix = mat4_mul_mat4(world_matrix, scale_matrix);
+            // Order matters: First scale, then rotate, then translate. [T]*[R]*[S]*v
+            world_matrix = mat4_mul_mat4(scale_matrix, world_matrix);
+            world_matrix = mat4_mul_mat4(rotation_matrix_z, world_matrix);
+            world_matrix = mat4_mul_mat4(rotation_matrix_y, world_matrix);
+            world_matrix = mat4_mul_mat4(rotation_matrix_x, world_matrix);
+            world_matrix = mat4_mul_mat4(translation_matrix, world_matrix);
 
             // Multiply the world matrix by the original vector
             transformed_vertex = mat4_mul_vec4(world_matrix, transformed_vertex);
@@ -221,21 +202,21 @@ void update(void) {
         // Get individual vectors from A, B, and C vertices to compute normal
         vec3_t vector_a = vec3_from_vec4(transformed_vertices[0]); /*   A   */
         vec3_t vector_b = vec3_from_vec4(transformed_vertices[1]); /*  / \  */
-        vec3_t vector_c = vec3_from_vec4(transformed_vertices[2]); /* B---C */
+        vec3_t vector_c = vec3_from_vec4(transformed_vertices[2]); /* C---B */
 
-        // Get the vector subtraction of A-B and A-C
-        vec3_t vector_ab = vec3_sub(vector_a, vector_b);
-        vec3_t vector_ac = vec3_sub(vector_a, vector_c);
+        // Get the vector subtraction of B-A and C-A
+        vec3_t vector_ab = vec3_sub(vector_b, vector_a);
+        vec3_t vector_ac = vec3_sub(vector_c, vector_a);
         vec3_normalize(&vector_ab);
         vec3_normalize(&vector_ac);
 
-        // Compute the face normal (using the cross product to find perpendicular vector)
+        // Compute the face normal (using cross product to find perpendicular)
         vec3_t normal = vec3_cross(vector_ab, vector_ac);
         vec3_normalize(&normal);
 
-        // Find the vector between a point in the triangle (A) and the eye origin position
-        vec3_t eye_origin = { 0, 0, 0 };
-        vec3_t camera_ray = vec3_sub(eye_origin, vector_a);
+        // Find the vector between vertex A in the triangle and the camera origin
+        vec3_t origin = { 0, 0, 0 };
+        vec3_t camera_ray = vec3_sub(origin, vector_a);
 
         // Calculate how aligned the camera ray is with the face normal (using dot product)
         float dot_normal_camera = vec3_dot(normal, camera_ray);
@@ -250,10 +231,20 @@ void update(void) {
 
         vec4_t projected_points[3];
 
-        // Loop all three vertices to perform projection
+        // Loop all three vertices to perform projection and conversion to screen space
         for (int j = 0; j < 3; j++) {
-            // Project the current vertex
-            projected_points[j] = mat4_mul_vec4_project(proj_matrix, transformed_vertices[j]);
+            // Project the current vertex using a perspective projection matrix
+            projected_points[j] = mat4_mul_vec4(proj_matrix, transformed_vertices[j]);
+
+            // Perform perspective divide
+            if (projected_points[j].w != 0) {
+                projected_points[j].x /= projected_points[j].w;
+                projected_points[j].y /= projected_points[j].w;
+                projected_points[j].z /= projected_points[j].w;
+            }
+
+            // Flip vertically since the y values of the 3D mesh grow bottom->up and in screen space y values grow top->down
+            projected_points[j].y *= -1;
 
             // Scale into the view
             projected_points[j].x *= (window_width / 2.0);
@@ -264,15 +255,13 @@ void update(void) {
             projected_points[j].y += (window_height / 2.0);
         }
 
-        // Calculate the average depth for each face based on the vertices after transformation
-        float avg_depth = (transformed_vertices[0].z + transformed_vertices[1].z + transformed_vertices[2].z) / 3.0;
-
-        // Calculate the shade intensity based on how aliged is the face normal and the light ray
-        float light_intensity_factor = vec3_dot(normal, light.direction);
+        // Calculate the shade intensity based on how aliged is the normal with the flipped light direction ray
+        float light_intensity_factor = -vec3_dot(normal, light.direction);
 
         // Calculate the triangle color based on the light angle
         uint32_t triangle_color = light_apply_intensity(mesh_face.color, light_intensity_factor);
 
+        // Create the final projected triangle that will be rendered in screen space
         triangle_t projected_triangle = {
             .points = {
                 { projected_points[0].x, projected_points[0].y, projected_points[0].z, projected_points[0].w },
@@ -284,26 +273,12 @@ void update(void) {
                 { mesh_face.b_uv.u, mesh_face.b_uv.v },
                 { mesh_face.c_uv.u, mesh_face.c_uv.v }
             },
-            .color = triangle_color,
-            .avg_depth = avg_depth
+            .color = triangle_color
         };
 
         // Save the projected triangle in the array of triangles to render
-        array_push(triangles_to_render, projected_triangle);
-    }
-
-    // Sort the triangles to render by their avg_depth if we are drawing filled triangles
-    if (render_method == RENDER_FILL_TRIANGLE || render_method == RENDER_FILL_TRIANGLE_WIRE) {
-        int num_triangles = array_length(triangles_to_render);
-        for (int i = 0; i < num_triangles; i++) {
-            for (int j = i; j < num_triangles; j++) {
-                if (triangles_to_render[i].avg_depth < triangles_to_render[j].avg_depth) {
-                    // Swap the triangles positions in the array
-                    triangle_t temp = triangles_to_render[i];
-                    triangles_to_render[i] = triangles_to_render[j];
-                    triangles_to_render[j] = temp;
-                }
-            }
+        if (num_triangles_to_render < MAX_TRIANGLES) {
+            triangles_to_render[num_triangles_to_render++] = projected_triangle;
         }
     }
 }
@@ -315,18 +290,17 @@ void render(void) {
     SDL_RenderClear(renderer);
 
     draw_grid();
-
+    
     // Loop all projected triangles and render them
-    int num_triangles = array_length(triangles_to_render);
-    for (int i = 0; i < num_triangles; i++) {
+    for (int i = 0; i < num_triangles_to_render; i++) {
         triangle_t triangle = triangles_to_render[i];
 
         // Draw filled triangle
         if (render_method == RENDER_FILL_TRIANGLE || render_method == RENDER_FILL_TRIANGLE_WIRE) {
             draw_filled_triangle(
-                triangle.points[0].x, triangle.points[0].y, // vertex A
-                triangle.points[1].x, triangle.points[1].y, // vertex B
-                triangle.points[2].x, triangle.points[2].y, // vertex C
+                triangle.points[0].x, triangle.points[0].y, triangle.points[0].z, triangle.points[0].w, // vertex A
+                triangle.points[1].x, triangle.points[1].y, triangle.points[1].z, triangle.points[1].w, // vertex B
+                triangle.points[2].x, triangle.points[2].y, triangle.points[2].z, triangle.points[2].w, // vertex C
                 triangle.color
             );
         }
@@ -353,17 +327,16 @@ void render(void) {
 
         // Draw triangle vertex points
         if (render_method == RENDER_WIRE_VERTEX) {
-            draw_rect(triangle.points[0].x - 3, triangle.points[0].y - 3, 6, 6, 0xFF0000FF); // vertex A
-            draw_rect(triangle.points[1].x - 3, triangle.points[1].y - 3, 6, 6, 0xFF0000FF); // vertex B
-            draw_rect(triangle.points[2].x - 3, triangle.points[2].y - 3, 6, 6, 0xFF0000FF); // vertex C
+            draw_rect(triangle.points[0].x, triangle.points[0].y, 1, 1, 0xFF0000FF); // vertex A
+            draw_rect(triangle.points[1].x, triangle.points[1].y, 1, 1, 0xFF0000FF); // vertex B
+            draw_rect(triangle.points[2].x, triangle.points[2].y, 1, 1, 0xFF0000FF); // vertex C
         }
     }
 
-    // Clear the array of triangles to render every frame loop
-    array_free(triangles_to_render);
-
+    // Finally draw the color buffer to the SDL window
     render_color_buffer();
 
+    // Clear all the arrays to get ready for the next frame
     clear_color_buffer(0xFF000000);
     clear_z_buffer();
 

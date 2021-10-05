@@ -1,20 +1,8 @@
-###############################################################################
-# Variables
-###############################################################################
-CC = gcc
-CC_FLAGS = -std=c99 -Wall
-SRC = ./src/*.c
-LINKER_FLAGS = -lm -lSDL2
-BIN_NAME = renderer
-
-###############################################################################
-# Makefile rules
-###############################################################################
 build:
-	${CC} ${CC_FLAGS} ${SRC} ${LINKER_FLAGS} -o ${BIN_NAME}
+	gcc -Wall -Wfatal-errors -std=c99 ./src/*.c -lSDL2 -lm -o renderer
 
 run:
-	./${BIN_NAME}
+	./renderer
 
 clean:
-	rm ${BIN_NAME}
+	rm renderer
